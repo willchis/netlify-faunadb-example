@@ -1,8 +1,6 @@
 import React, { Component } from 'react'
 import ContentEditable from './components/ContentEditable'
 import AppHeader from './components/AppHeader'
-import SettingsMenu from './components/SettingsMenu'
-import SettingsIcon from './components/SettingsIcon'
 import analytics from './utils/analytics'
 import api from './utils/api'
 import sortByDate from './utils/sortByDate'
@@ -18,6 +16,21 @@ export default class App extends Component {
 
     /* Track a page view */
     analytics.page()
+
+    if (window.location.pathname?.length > 1) {
+      api.read(window.location.pathname.substring(1)).then(searchResult => {
+        if (searchResult?.data?.length) {
+
+          this.setState({
+            shareo: {
+              // todo - sort out the weird index result structure
+              contents: searchResult.data[0][0],
+              title: searchResult.data[0][1],
+            }
+          });
+        }
+      });
+    }
 
     // Fetch all todos
     api.readAll().then((todos) => {
@@ -36,6 +49,7 @@ export default class App extends Component {
       })
     })
   }
+
   saveTodo = (e) => {
     e.preventDefault()
     const { todos } = this.state
@@ -52,6 +66,7 @@ export default class App extends Component {
 
     const todoInfo = {
       title: todoValue,
+      contents: 'hellohello',
       completed: false,
     }
     // Optimistically add todo to UI
@@ -189,64 +204,7 @@ export default class App extends Component {
       })
     }
   }
-  clearCompleted = () => {
-    const { todos } = this.state
 
-    // Optimistically remove todos from UI
-    const data = todos.reduce((acc, current) => {
-      if (current.data.completed) {
-        // save item being removed for rollback
-        acc.completedTodoIds = acc.completedTodoIds.concat(getTodoId(current))
-        return acc
-      }
-      // filter deleted todo out of the todos list
-      acc.optimisticState = acc.optimisticState.concat(current)
-      return acc
-    }, {
-      completedTodoIds: [],
-      optimisticState: []
-    })
-
-    // only set state if completed todos exist
-    if (!data.completedTodoIds.length) {
-      alert('Please check off some todos to batch remove them')
-      this.closeModal()
-      return false
-    }
-
-    this.setState({
-      todos: data.optimisticState
-    }, () => {
-      setTimeout(() => {
-        this.closeModal()
-      }, 600)
-
-      api.batchDelete(data.completedTodoIds).then(() => {
-        console.log(`Batch removal complete`, data.completedTodoIds)
-        analytics.track('todosBatchDeleted', {
-          category: 'todos',
-        })
-      }).catch((e) => {
-        console.log('An API error occurred', e)
-      })
-    })
-  }
-  closeModal = (e) => {
-    this.setState({
-      showMenu: false
-    })
-    analytics.track('modalClosed', {
-      category: 'modal'
-    })
-  }
-  openModal = () => {
-    this.setState({
-      showMenu: true
-    })
-    analytics.track('modalOpened', {
-      category: 'modal'
-    })
-  }
   renderTodos() {
     const { todos } = this.state
 
@@ -310,13 +268,16 @@ export default class App extends Component {
 
         <div className='todo-list'>
           <h2>
-            Create todo
-            <SettingsIcon onClick={this.openModal} className='mobile-toggle' />
+            {window.location.pathname}
+            Create Share-o
           </h2>
+          <div>title: {this.state.shareo?.title}</div>
+          <hr/>
+          <div>contents: {this.state.shareo?.contents}</div>
           <form className='todo-create-wrapper' onSubmit={this.saveTodo}>
             <input
               className='todo-create-input'
-              placeholder='Add a todo item'
+              placeholder='Create a new Share-o'
               name='name'
               ref={el => this.inputElement = el}
               autoComplete='off'
@@ -324,19 +285,15 @@ export default class App extends Component {
             />
             <div className='todo-actions'>
               <button className='todo-create-button'>
-                Create todo
+                Go
               </button>
-              <SettingsIcon onClick={this.openModal}  className='desktop-toggle' />
+              
             </div>
           </form>
 
           {this.renderTodos()}
         </div>
-        <SettingsMenu
-          showMenu={this.state.showMenu}
-          handleModalClose={this.closeModal}
-          handleClearCompleted={this.clearCompleted}
-        />
+
       </div>
     )
   }
